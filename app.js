@@ -7,7 +7,8 @@ const express = require("express");
 const bodyParser = require("body-parser");
 const ejs = require("ejs");
 const mongoose = require("mongoose");
-const md5 = require('md5');
+const bcrypt = require('bcrypt');
+const saltRounds = 10;
 
 const app = express();
 
@@ -48,24 +49,23 @@ app.get("/login", function(req, res) {
 
 app.post("/login", function(req, res) {
   const inputUserName = req.body.username;
-  const inputPassword = md5(req.body.password);
+  const inputPassword = req.body.password;
+
   User.findOne({
-    email: inputUserName,
+    email: inputUserName
   }, function(err, foundUser) {
     if (err) {
       console.log(err);
     } else {
       if (foundUser) {
-        if (foundUser.password === inputPassword) {
-          res.render("secrets");
-        } else {
-          res.send("Please check your email and passwords again.")
-        }
-      } else {
-        res.send("Please check your email and passwords again.")
+        bcrypt.compare(inputPassword, foundUser.password, function(err, result) {
+          if (result === true) {
+            res.render("secrets");
+          }
+        });
       }
     }
-  });
+  })
 });
 
 // *****************
@@ -76,17 +76,19 @@ app.get("/register", function(req, res) {
 });
 
 app.post("/register", function(req, res) {
-  const newUser = new User({
-    email: req.body.username,
-    password: md5(req.body.password)
-  });
-  newUser.save(function(err) {
-    if (err) {
-      console.log(err);
-    } else {
-      // We only want to render this secrets page when the user is registered or logged in.
-      res.render("secrets");
-    }
+  bcrypt.hash(req.body.password, saltRounds, function(err, hash) {
+    const newUser = new User({
+      email: req.body.username,
+      password: hash
+    })
+    newUser.save(function(err) {
+      if (err) {
+        console.log(err);
+      } else {
+        // We only want to render this secrets page when the user is registered or logged in.
+        res.render("secrets");
+      }
+    });
   });
 });
 
